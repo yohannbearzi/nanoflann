@@ -33,6 +33,10 @@
 
 // Declare custom container PointCloud<T>:
 #include "utils.h"
+#include <chrono>
+
+using namespace std;
+using namespace nanoflann;
 
 void dump_mem_usage();
 
@@ -101,21 +105,41 @@ void kdtree_demo(const size_t N)
         nanoflann::L2_Simple_Adaptor<num_t, PC2KD>, PC2KD, 3 /* dim */
         >;
 
-    dump_mem_usage();
+	my_kd_tree_t   index(3 /*dim*/, pc2kd, KDTreeSingleIndexAdaptorParams(10 /* max leaf */) );
+  auto start = std::chrono::high_resolution_clock::now();
+	index.buildIndex();
+  auto elapsed = std::chrono::high_resolution_clock::now() - start;
+  long long microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+  std::cout << "Build time " << microseconds << " for " << N << " points " << std::endl;
+	dump_mem_usage();
 
-    my_kd_tree_t index(3 /*dim*/, pc2kd, {10 /* max leaf */});
-    index.buildIndex();
-    dump_mem_usage();
+  double max_range = 10;
 
-    // do a knn search
-    const size_t                   num_results = 1;
-    size_t                         ret_index;
-    num_t                          out_dist_sqr;
-    nanoflann::KNNResultSet<num_t> resultSet(num_results);
-    resultSet.init(&ret_index, &out_dist_sqr);
-    index.findNeighbors(resultSet, &query_pt[0], nanoflann::SearchParams(10));
-    // index.knnSearch(query, indices, dists, num_results,
-    // mrpt_flann::SearchParams(10));
+  // do a knn search
+  const size_t num_results = 10;
+  size_t ret_index[10];
+  num_t out_dist_sqr[10];
+  nanoflann::KNNResultSet<num_t> resultSet(num_results);
+  resultSet.init(ret_index, out_dist_sqr );
+
+  start = std::chrono::high_resolution_clock::now();
+
+  for (size_t i = 0; i < N; i++)
+  {
+    query_pt[0] = max_range * (rand() % 1000) / 1000.0;
+    query_pt[1] = max_range * (rand() % 1000) / 1000.0;
+    query_pt[2] = max_range * (rand() % 1000) / 1000.0;
+//    locator->FindClosestNPoints(20, x, result);
+
+    index.findNeighbors(resultSet, query_pt, nanoflann::SearchParams(1000000));
+    //index.knnSearch(query, indices, dists, num_results, mrpt_flann::SearchParams(10));
+  }
+  elapsed = std::chrono::high_resolution_clock::now() - start;
+  microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+  std::cout << "Search time " << microseconds << " for " << N << " points and " << num_results << " queries" << std::endl;
+
+//	std::cout << "knnSearch(nn="<<num_results<<"): \n";
+//	std::cout << "ret_index=" << ret_index << " out_dist_sqr=" << out_dist_sqr << endl;
 
     std::cout << "knnSearch(nn=" << num_results << "): \n";
     std::cout << "ret_index=" << ret_index << " out_dist_sqr=" << out_dist_sqr
